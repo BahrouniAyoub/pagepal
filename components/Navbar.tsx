@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import {usePathname} from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Show, SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
-import {cn} from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const navItems = [
     { label: "Library", href: "/" },
@@ -17,7 +17,7 @@ const Navbar = () => {
     const { user } = useUser();
 
     return (
-        <header className="w-full fixed z-50 bg-(--bg-primary)">
+        <header className="w-full fixed z-50 bg-[var(--bg-primary)]">
             <div className="wrapper navbar-height py-4 flex justify-between items-center">
                 <Link href="/" className="flex gap-0.5 items-center">
                     <Image src="/assets/logo.png" alt="Bookfied" width={42} height={26} />
