@@ -5,11 +5,17 @@ import { getAllBooks } from "@/lib/actions/book.actions"
 const page = async () => {
 
   const bookResults = await getAllBooks();
-  const books = bookResults.success? bookResults.data ?? [] : [];
+
+  if (!bookResults.success) {
+    throw new Error("Failed to load books");
+  }
+
+  const books = bookResults.data ?? [];
+  
   return (
     <main className="wrapper container">
       <HeroSection />
-      
+
       <div className="library-books-grid" >
         {books.map((book) => (
           <BookCard
@@ -20,9 +26,9 @@ const page = async () => {
             slug={book.slug} />
         ))
         }
-      </div> 
+      </div>
     </main>
-  ) 
+  )
 }
 
 export default page
