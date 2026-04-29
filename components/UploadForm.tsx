@@ -9,24 +9,22 @@ import { BookUploadFormValues } from '@/types';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ACCEPTED_PDF_TYPES, ACCEPTED_IMAGE_TYPES } from '@/lib/constants';
+import { ACCEPTED_PDF_TYPES, ACCEPTED_IMAGE_TYPES, DEFAULT_VOICE } from '@/lib/constants';
 import FileUploader from './FileUploader';
 import VoiceSelector from './VoiceSelector';
 import LoadingOverlay from './LoadingOverlay';
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { toast } from 'sonner';
+import { checkBookExists, createBook, saveBookSegments } from "@/lib/actions/book.actions";
 import { useRouter } from "next/navigation";
 import { parsePDFFile } from "@/lib/utils";
 import { upload } from "@vercel/blob/client";
-
-// ❌ Removed import
-// import {checkBookExists, createBook, saveBookSegments} from "@/lib/actions/book.actions";
 
 const UploadForm = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
     const { userId } = useAuth();
-    const router = useRouter();
+    const router = useRouter()
 
     useEffect(() => {
         setIsMounted(true);
@@ -50,15 +48,17 @@ const UploadForm = () => {
 
         setIsSubmitting(true);
 
+        // PostHog -> Track Book Uploads...
+
         try {
-            // ❌ Removed exists check
-            // const existsCheck = await checkBookExists(data.title);
-            // if(existsCheck.exists && existsCheck.book) {
-            //     toast.info("Book with same title already exists.");
-            //     form.reset()
-            //     router.push(`/books/${existsCheck.book.slug}`)
-            //     return;
-            // }
+            const existsCheck = await checkBookExists(data.title);
+
+            if (existsCheck.exists && existsCheck.book) {
+                toast.info("Book with same title already exists.");
+                form.reset()
+                router.push(`/books/${existsCheck.book.slug}`)
+                return;
+            }
 
             const fileTitle = data.title.replace(/\s+/g, '-').toLowerCase();
             const pdfFile = data.pdfFile;
@@ -87,7 +87,7 @@ const UploadForm = () => {
                 });
                 coverUrl = uploadedCoverBlob.url;
             } else {
-                const response = await fetch(parsedPDF.cover);
+                const response = await fetch(parsedPDF.cover)
                 const blob = await response.blob();
 
                 const uploadedCoverBlob = await upload(`${fileTitle}_cover.png`, blob, {
@@ -98,16 +98,55 @@ const UploadForm = () => {
                 coverUrl = uploadedCoverBlob.url;
             }
 
-            // ❌ Removed book creation and segment saving
-            // const book = await createBook({...});
-            // if(!book.success) { ... }
-            // const segments = await saveBookSegments(book.data._id, userId, parsedPDF.content);
+            const book = await createBook({
+                clerkId: userId,
+                title: data.title,
+                author: data.author,
+                persona: data.persona,
+                fileURL: uploadedPdfBlob.url,
+                fileBlobKey: uploadedPdfBlob.pathname,
+                coverURL: coverUrl,
+                fileSize: pdfFile.size,
+            });
 
-            // ✅ At this point, PDF and cover are uploaded — integrate backend here
+            console.log("createBook result:", book);
+
+            if (!book.success) {
+                const message =
+                    book.error instanceof Error
+                        ? book.error.message
+                        : typeof book.error === "string"
+                            ? book.error
+                            : "Failed to create book";
+
+                toast.error(message);
+
+                // if (book.isBillingError) {
+                //     router.push("/subscriptions");
+                // }
+                // return;
+            }
+
+
+            if (book.alreadyExists) {
+                toast.info("Book with same title already exists.");
+                form.reset()
+                router.push(`/books/${book.data.slug}`)
+                return;
+            }
+
+            const segments = await saveBookSegments(book.data._id, userId, parsedPDF.content);
+
+            if (!segments.success) {
+                toast.error("Failed to save book segments");
+                throw new Error("Failed to save book segments");
+            }
+
             form.reset();
             router.push('/');
         } catch (error) {
             console.error(error);
+
             toast.error("Failed to upload book. Please try again later.");
         } finally {
             setIsSubmitting(false);
