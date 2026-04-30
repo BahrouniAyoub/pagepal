@@ -121,10 +121,10 @@ const UploadForm = () => {
 
                 toast.error(message);
 
-                // if (book.isBillingError) {
-                //     router.push("/subscriptions");
-                // }
-                // return;
+                if (book.isBillingError) {
+                    router.push("/subscriptions");
+                }
+                return;
             }
 
 
